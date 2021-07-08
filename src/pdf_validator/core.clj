@@ -9,6 +9,7 @@
     -vv   List full error details
     -vvv  List each error individually"
   (:require [pdf-validator.validate :as validate]
+            [pdf-validator.known-errors :as known-errors]
             [clojure.string :as str]))
 
 (defn print-simple-table
@@ -16,6 +17,11 @@
   (println (apply format fmt headers))
   (doseq [row rows]
     (println (apply format fmt (map #(or (row %) "") headers)))))
+
+(defn add-known? [error]
+  (assoc error :known? (cond
+                         (known-errors/known-bad? error) :error
+                         (known-errors/ignorable? error) :ok)))
 
 (defn format-errors
   "Sort, group, and count errors in preparation for printing."
@@ -35,7 +41,8 @@
   (update e :details #(or (re-find #"^[^,]+" %) %)))
 
 (defn headers->fmt [headers]
-  (let [widths {:page "5"
+  (let [widths {:known? "-7"
+                :page "5"
                 :code "-5"
                 :category "-12"
                 :count "6"}]
@@ -55,9 +62,11 @@
    1 {:map-fn simplify-details
       :group-fn :details
       :headers [:page :category :code :count :details]}
-   2 {:group-fn (juxt :page :code :details)
-      :headers [:page :code :count :details]}
-   3 {:headers [:page :code :details]}})
+   2 {:map-fn add-known?
+      :group-fn (juxt :page :code :details)
+      :headers [:known? :page :code :count :details]}
+   3 {:map-fn add-known?
+      :headers [:known? :page :code :details]}})
 
 (defn output-format [level]
   (let [f (merge default-formats (verbosity-formats level))]
